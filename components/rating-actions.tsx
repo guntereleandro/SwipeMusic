@@ -2,7 +2,8 @@ import { DislikeIcon, LikeIcon, NeutralIcon } from "@/components/icons";
 import type { Rating } from "@/types/song";
 
 type RatingActionsProps = {
-  onRate: (rating: Rating) => void;
+  disabled?: boolean;
+  onRate: (rating: Rating) => void | Promise<boolean>;
 };
 
 const actions = [
@@ -34,9 +35,13 @@ const actions = [
   className: string;
 }>;
 
-export function RatingActions({ onRate }: RatingActionsProps) {
+export function RatingActions({ disabled = false, onRate }: RatingActionsProps) {
   return (
-    <div className="grid grid-cols-3 gap-2" aria-label="Avaliação">
+    <div
+      className="grid grid-cols-3 gap-2"
+      aria-label="Avaliação"
+      data-swipe-ignore="true"
+    >
       {actions.map((action) => {
         const Icon = action.icon;
 
@@ -44,8 +49,9 @@ export function RatingActions({ onRate }: RatingActionsProps) {
           <button
             key={action.status}
             type="button"
-            onClick={() => onRate(action.status)}
-            className={`flex min-h-16 flex-col items-center justify-center gap-1.5 rounded-xl border border-white/[0.08] bg-white/[0.035] px-1.5 py-2 text-[11px] font-semibold transition duration-200 focus-visible:outline-2 focus-visible:outline-offset-2 active:scale-[0.96] sm:min-h-[4.5rem] sm:text-xs ${action.className}`}
+            disabled={disabled}
+            onClick={() => void onRate(action.status)}
+            className={`flex min-h-16 flex-col items-center justify-center gap-1.5 rounded-xl border border-white/[0.08] bg-white/[0.035] px-1.5 py-2 text-[11px] font-semibold transition duration-200 focus-visible:outline-2 focus-visible:outline-offset-2 active:scale-[0.96] disabled:cursor-wait disabled:opacity-50 sm:min-h-[4.5rem] sm:text-xs ${action.className}`}
           >
             <Icon className="size-5 sm:size-[1.35rem]" />
             <span>{action.label}</span>

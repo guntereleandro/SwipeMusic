@@ -2,16 +2,22 @@
 
 import type { ReactNode } from "react";
 import { MusicCard } from "@/components/music-card";
-import { useSwipeGesture } from "@/hooks/use-swipe-gesture";
+import { SWIPE_DEBUG, useSwipeGesture } from "@/hooks/use-swipe-gesture";
 import type { Rating, Song } from "@/types/song";
 
 type SwipeableMusicCardProps = {
   song: Song;
-  onSwipe: (rating: Extract<Rating, "LIKE" | "DISLIKE">) => void;
+  disabled?: boolean;
+  onSwipe: (rating: Extract<Rating, "LIKE" | "DISLIKE">) => Promise<boolean>;
   children: ReactNode;
 };
 
-export function SwipeableMusicCard({ song, onSwipe, children }: SwipeableMusicCardProps) {
+export function SwipeableMusicCard({
+  song,
+  disabled = false,
+  onSwipe,
+  children,
+}: SwipeableMusicCardProps) {
   const {
     setCardElement,
     style,
@@ -20,7 +26,8 @@ export function SwipeableMusicCard({ song, onSwipe, children }: SwipeableMusicCa
     feedbackStrength,
     isDragging,
     isExiting,
-  } = useSwipeGesture({ onSwipe });
+    debug,
+  } = useSwipeGesture({ disabled, onSwipe });
 
   return (
     <div
@@ -31,6 +38,7 @@ export function SwipeableMusicCard({ song, onSwipe, children }: SwipeableMusicCa
         WebkitUserSelect: isDragging ? "none" : "auto",
       }}
       {...handlers}
+      aria-busy={disabled}
       className={`swipe-card relative will-change-transform ${isDragging ? "cursor-grabbing select-none" : "cursor-grab"} ${isExiting ? "pointer-events-none" : ""}`}
     >
       <div
@@ -48,7 +56,20 @@ export function SwipeableMusicCard({ song, onSwipe, children }: SwipeableMusicCa
         Não gosto
       </div>
 
-      <MusicCard song={song}>{children}</MusicCard>
+      <MusicCard song={song}>
+        {children}
+      </MusicCard>
+
+      {SWIPE_DEBUG && process.env.NODE_ENV === "development" && (
+        <aside className="pointer-events-none fixed bottom-2 left-2 z-50 w-[min(15rem,calc(100vw-1rem))] rounded-lg border border-cyan-400/40 bg-black/90 p-2 font-mono text-[10px] leading-4 text-cyan-200 shadow-xl">
+          <p className="font-bold text-cyan-300">SWIPE DEBUG</p>
+          <p>EVENT: {debug.event}</p>
+          <p>DX: {debug.deltaX} · DY: {debug.deltaY}</p>
+          <p>pointerType: {debug.pointerType}</p>
+          <p>hasPointerCapture: {String(debug.hasPointerCapture)}</p>
+          <p>dragging: {String(debug.dragging)}</p>
+        </aside>
+      )}
     </div>
   );
 }

@@ -32,11 +32,21 @@ export function MusicCard({ song, children }: MusicCardProps) {
         </p>
       </div>
 
-      <div className="mt-3.5" data-no-swipe>
+      <div
+        className="mt-3.5"
+        data-swipe-ignore="true"
+        style={{ touchAction: "auto" }}
+      >
         <AudioPlayer key={song.id} src={song.audioUrl} title={song.title} />
       </div>
 
-      <div className="mt-3 border-t border-white/[0.07] pt-3">{children}</div>
+      <div
+        className="mt-3 border-t border-white/[0.07] pt-3"
+        data-swipe-ignore="true"
+        style={{ touchAction: "manipulation" }}
+      >
+        {children}
+      </div>
     </article>
   );
 }

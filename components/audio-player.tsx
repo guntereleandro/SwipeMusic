@@ -48,7 +48,10 @@ export function AudioPlayer({ src, title }: AudioPlayerProps) {
   }
 
   return (
-    <div className="rounded-2xl bg-white/[0.055] px-4 py-3.5">
+    <div
+      className="rounded-2xl bg-white/[0.055] px-4 py-3.5"
+      data-swipe-ignore="true"
+    >
       <audio
         ref={audioRef}
         src={src}

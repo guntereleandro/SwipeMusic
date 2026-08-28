@@ -1,43 +1,168 @@
 "use client";
 
-import { useState } from "react";
+import Link from "next/link";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { CheckIcon, UndoIcon } from "@/components/icons";
 import { RatingActions } from "@/components/rating-actions";
 import { SwipeableMusicCard } from "@/components/swipeable-music-card";
-import type { Rating, Song } from "@/types/song";
+import type { RatingRow, SongRow } from "@/lib/supabase/database.types";
+import {
+  listRatings,
+  saveRating,
+  undoLastRating as deleteLastRating,
+} from "@/lib/supabase/repositories/ratings";
+import { listSongs } from "@/lib/supabase/repositories/songs";
+import { getAudioUrl, getCoverUrl } from "@/lib/supabase/media";
+import type { Rating, Song, SongStatus } from "@/types/song";
 
-type MusicRaterProps = {
-  initialSongs: Song[];
+type OperationError = {
+  kind: "LOAD" | "SAVE" | "UNDO";
+  message: string;
 };
 
-export function MusicRater({ initialSongs }: MusicRaterProps) {
-  const [songs, setSongs] = useState(initialSongs);
+function isRating(value: string): value is Rating {
+  return value === "LIKE" || value === "NEUTRAL" || value === "DISLIKE";
+}
+
+function toSong(song: SongRow, rating?: RatingRow): Song {
+  const status: SongStatus = rating && isRating(rating.rating) ? rating.rating : "PENDING";
+
+  return {
+    id: song.id,
+    title: song.title,
+    artist: song.artist ?? "Artista desconhecido",
+    coverUrl: getCoverUrl(song.cover_path),
+    audioUrl: getAudioUrl(song.audio_path),
+    status,
+  };
+}
+
+async function fetchMusicLibrary() {
+  const [songRows, ratingRows] = await Promise.all([listSongs(), listRatings()]);
+  const ratingBySongId = new Map(ratingRows.map((rating) => [rating.song_id, rating]));
+
+  return {
+    songs: songRows.map((song) => toSong(song, ratingBySongId.get(song.id))),
+    history: ratingRows.map((rating) => rating.song_id),
+  };
+}
+
+function getErrorMessage(error: unknown, fallback: string) {
+  return error instanceof Error ? error.message : fallback;
+}
+
+export function MusicRater() {
+  const operationLock = useRef(false);
+  const [songs, setSongs] = useState<Song[]>([]);
   const [history, setHistory] = useState<string[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
+  const [error, setError] = useState<OperationError | null>(null);
 
   const currentSong = songs.find((song) => song.status === "PENDING");
   const evaluatedCount = songs.filter((song) => song.status !== "PENDING").length;
 
-  function rateCurrentSong(rating: Rating) {
-    if (!currentSong) return;
+  const loadLibrary = useCallback(async () => {
+    setIsLoading(true);
+    setError(null);
 
-    setSongs((currentSongs) =>
-      currentSongs.map((song) =>
-        song.id === currentSong.id ? { ...song, status: rating } : song,
-      ),
-    );
-    setHistory((currentHistory) => [...currentHistory, currentSong.id]);
+    try {
+      const library = await fetchMusicLibrary();
+      setSongs(library.songs);
+      setHistory(library.history);
+    } catch (loadError) {
+      setError({
+        kind: "LOAD",
+        message: getErrorMessage(loadError, "Não foi possível carregar a biblioteca."),
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    void fetchMusicLibrary()
+      .then((library) => {
+        if (cancelled) return;
+        setSongs(library.songs);
+        setHistory(library.history);
+      })
+      .catch((loadError: unknown) => {
+        if (cancelled) return;
+        setError({
+          kind: "LOAD",
+          message: getErrorMessage(loadError, "Não foi possível carregar a biblioteca."),
+        });
+      })
+      .finally(() => {
+        if (!cancelled) setIsLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  async function rateCurrentSong(rating: Rating): Promise<boolean> {
+    if (!currentSong || operationLock.current) return false;
+
+    operationLock.current = true;
+    setIsSaving(true);
+    setError(null);
+
+    try {
+      await saveRating(currentSong.id, rating);
+      setSongs((currentSongs) =>
+        currentSongs.map((song) =>
+          song.id === currentSong.id ? { ...song, status: rating } : song,
+        ),
+      );
+      setHistory((currentHistory) => [...currentHistory, currentSong.id]);
+      return true;
+    } catch (saveError) {
+      setError({
+        kind: "SAVE",
+        message: getErrorMessage(saveError, "Não foi possível salvar a avaliação."),
+      });
+      return false;
+    } finally {
+      operationLock.current = false;
+      setIsSaving(false);
+    }
   }
 
-  function undoLastRating() {
-    const lastSongId = history.at(-1);
-    if (!lastSongId) return;
+  async function undoLastRating() {
+    if (operationLock.current) return;
 
-    setSongs((currentSongs) =>
-      currentSongs.map((song) =>
-        song.id === lastSongId ? { ...song, status: "PENDING" } : song,
-      ),
-    );
-    setHistory((currentHistory) => currentHistory.slice(0, -1));
+    operationLock.current = true;
+    setIsSaving(true);
+    setError(null);
+
+    try {
+      const undoneRating = await deleteLastRating();
+      if (!undoneRating) return;
+
+      setSongs((currentSongs) => {
+        const restoredSong = currentSongs.find((song) => song.id === undoneRating.song_id);
+        if (!restoredSong) return currentSongs;
+
+        return [
+          { ...restoredSong, status: "PENDING" },
+          ...currentSongs.filter((song) => song.id !== undoneRating.song_id),
+        ];
+      });
+      setHistory((currentHistory) => currentHistory.slice(0, -1));
+    } catch (undoError) {
+      setError({
+        kind: "UNDO",
+        message: getErrorMessage(undoError, "Não foi possível desfazer a avaliação."),
+      });
+    } finally {
+      operationLock.current = false;
+      setIsSaving(false);
+    }
   }
 
   return (
@@ -52,20 +177,41 @@ export function MusicRater({ initialSongs }: MusicRaterProps) {
               SwipeMusic
             </h1>
           </div>
-          <p className="text-xs font-medium tabular-nums text-zinc-400" aria-live="polite">
-            <strong className="text-zinc-100">{evaluatedCount}</strong> de {songs.length}{" "}
-            avaliadas
-          </p>
+          <div className="flex items-center gap-3">
+            <Link href="/importacao" className="text-[11px] font-semibold text-zinc-500 transition hover:text-amber-300 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-500">Importação</Link>
+            <p className="text-xs font-medium tabular-nums text-zinc-400" aria-live="polite">
+              <strong className="text-zinc-100">{evaluatedCount}</strong> de {songs.length}{" "}
+              avaliadas
+            </p>
+          </div>
         </header>
 
-        {currentSong ? (
+        {isLoading ? (
+          <section className="my-auto text-center" aria-live="polite">
+            <span className="mx-auto block size-8 animate-spin rounded-full border-2 border-white/15 border-t-amber-500" />
+            <p className="mt-4 text-sm text-zinc-400">Carregando músicas...</p>
+          </section>
+        ) : error?.kind === "LOAD" ? (
+          <section className="my-auto rounded-[1.75rem] border border-rose-400/20 bg-[#1c1c1f] p-7 text-center shadow-[0_24px_70px_-28px_rgba(0,0,0,0.8)]">
+            <h2 className="text-xl font-bold text-zinc-50">Falha ao carregar</h2>
+            <p className="mt-2 text-sm leading-6 text-zinc-400">{error.message}</p>
+            <button
+              type="button"
+              onClick={() => void loadLibrary()}
+              className="mt-5 rounded-xl bg-amber-600 px-4 py-2.5 text-sm font-bold text-white transition hover:bg-amber-500 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-400"
+            >
+              Tentar novamente
+            </button>
+          </section>
+        ) : currentSong ? (
           <div className="flex flex-1 flex-col justify-center">
             <SwipeableMusicCard
               key={currentSong.id}
               song={currentSong}
+              disabled={isSaving}
               onSwipe={rateCurrentSong}
             >
-              <RatingActions onRate={rateCurrentSong} />
+              <RatingActions disabled={isSaving} onRate={rateCurrentSong} />
             </SwipeableMusicCard>
           </div>
         ) : (
@@ -82,12 +228,23 @@ export function MusicRater({ initialSongs }: MusicRaterProps) {
           </section>
         )}
 
+        {error && error.kind !== "LOAD" && (
+          <p
+            role="alert"
+            className="mt-3 rounded-xl border border-rose-400/20 bg-rose-400/10 px-3 py-2 text-center text-xs leading-5 text-rose-200"
+          >
+            {error.message} Tente novamente.
+          </p>
+        )}
+
         <footer className="mt-2.5 flex min-h-9 justify-center sm:mt-3">
-          {history.length > 0 && (
+          {!isLoading && history.length > 0 && (
             <button
               type="button"
-              onClick={undoLastRating}
-              className="inline-flex items-center gap-2 rounded-full px-4 py-2 text-xs font-semibold text-zinc-500 transition hover:bg-white/[0.06] hover:text-zinc-300 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-500 active:scale-[0.98]"
+              data-swipe-ignore="true"
+              disabled={isSaving}
+              onClick={() => void undoLastRating()}
+              className="inline-flex items-center gap-2 rounded-full px-4 py-2 text-xs font-semibold text-zinc-500 transition hover:bg-white/[0.06] hover:text-zinc-300 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-500 active:scale-[0.98] disabled:cursor-wait disabled:opacity-50"
             >
               <UndoIcon className="size-4" />
               Desfazer última avaliação
