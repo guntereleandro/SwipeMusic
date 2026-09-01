@@ -13,6 +13,7 @@ import {
 } from "@/lib/supabase/repositories/ratings";
 import { listSongs } from "@/lib/supabase/repositories/songs";
 import { getAudioUrl, getCoverUrl } from "@/lib/supabase/media";
+import { getLibraryProgress } from "@/lib/music/library";
 import type { Rating, Song, SongStatus } from "@/types/song";
 
 type OperationError = {
@@ -60,7 +61,7 @@ export function MusicRater() {
   const [error, setError] = useState<OperationError | null>(null);
 
   const currentSong = songs.find((song) => song.status === "PENDING");
-  const evaluatedCount = songs.filter((song) => song.status !== "PENDING").length;
+  const progress = getLibraryProgress(songs);
 
   const loadLibrary = useCallback(async () => {
     setIsLoading(true);
@@ -180,7 +181,7 @@ export function MusicRater() {
           <div className="flex items-center gap-3">
             <Link href="/importacao" className="text-[11px] font-semibold text-zinc-500 transition hover:text-amber-300 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-500">Importação</Link>
             <p className="text-xs font-medium tabular-nums text-zinc-400" aria-live="polite">
-              <strong className="text-zinc-100">{evaluatedCount}</strong> de {songs.length}{" "}
+              <strong className="text-zinc-100">{progress.evaluated}</strong> de {progress.total}{" "}
               avaliadas
             </p>
           </div>

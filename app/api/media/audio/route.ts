@@ -2,8 +2,8 @@ import "server-only";
 
 import { createClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/supabase/database.types";
+import { isValidAudioStoragePath } from "@/lib/supabase/media-path";
 
-const STORAGE_OBJECT_PATTERN = /^[a-f0-9]{64}\.mp3$/;
 const SIGNED_URL_TTL_SECONDS = 60 * 60;
 
 export const dynamic = "force-dynamic";
@@ -11,7 +11,7 @@ export const dynamic = "force-dynamic";
 export async function GET(request: Request) {
   const path = new URL(request.url).searchParams.get("path");
 
-  if (!path || !STORAGE_OBJECT_PATTERN.test(path)) {
+  if (!isValidAudioStoragePath(path)) {
     return Response.json({ error: "Caminho de áudio inválido." }, { status: 400 });
   }
 
@@ -30,6 +30,13 @@ export async function GET(request: Request) {
     .createSignedUrl(path, SIGNED_URL_TTL_SECONDS);
 
   if (error) {
+    if (error.name === "StorageUnknownError") {
+      return Response.json(
+        { error: "Não foi possível acessar o serviço de áudio." },
+        { status: 502 },
+      );
+    }
+
     return Response.json({ error: "Áudio não encontrado." }, { status: 404 });
   }
 

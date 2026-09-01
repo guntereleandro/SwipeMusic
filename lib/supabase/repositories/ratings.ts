@@ -1,15 +1,22 @@
 import { getSupabaseClient } from "@/lib/supabase/client";
 import type { RatingRow } from "@/lib/supabase/database.types";
 import type { Rating } from "@/types/song";
+import { listAllPages } from "@/lib/supabase/repositories/pagination";
 
 export async function listRatings(): Promise<RatingRow[]> {
-  const { data, error } = await getSupabaseClient()
-    .from("ratings")
-    .select("*")
-    .order("created_at", { ascending: true });
+  const client = getSupabaseClient();
 
-  if (error) throw new Error(`Não foi possível listar as avaliações: ${error.message}`);
-  return data;
+  return listAllPages(async (from, to) => {
+    const { data, error } = await client
+      .from("ratings")
+      .select("*")
+      .order("created_at", { ascending: true })
+      .order("id", { ascending: true })
+      .range(from, to);
+
+    if (error) throw new Error(`Não foi possível listar as avaliações: ${error.message}`);
+    return data;
+  });
 }
 
 export async function saveRating(songId: string, rating: Rating): Promise<RatingRow> {

@@ -106,7 +106,7 @@ export function AudioPlayer({ src, title }: AudioPlayerProps) {
 
       {hasError && (
         <p className="mt-2 text-center text-[11px] text-zinc-500" role="status">
-          Áudio de teste ainda não adicionado em public/audio.
+          Não foi possível carregar o áudio desta música.
         </p>
       )}
     </div>

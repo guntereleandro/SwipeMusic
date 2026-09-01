@@ -1,6 +1,6 @@
-import Image from "next/image";
 import type { ReactNode } from "react";
 import { AudioPlayer } from "@/components/audio-player";
+import { CoverImage } from "@/components/cover-image";
 import type { Song } from "@/types/song";
 
 type MusicCardProps = {
@@ -12,15 +12,7 @@ export function MusicCard({ song, children }: MusicCardProps) {
   return (
     <article className="overflow-hidden rounded-[1.75rem] border border-white/[0.08] bg-[#1c1c1f] p-3 shadow-[0_24px_70px_-28px_rgba(0,0,0,0.8)] sm:p-4">
       <div className="relative aspect-square overflow-hidden rounded-[1.25rem] bg-zinc-800 shadow-[0_12px_35px_-18px_rgba(0,0,0,0.9)]">
-        <Image
-          src={song.coverUrl}
-          alt={`Capa de ${song.title}`}
-          draggable={false}
-          fill
-          priority
-          sizes="(max-width: 640px) calc(100vw - 48px), 428px"
-          className="object-cover"
-        />
+        <CoverImage src={song.coverUrl} title={song.title} />
       </div>
 
       <div className="px-2 pb-1 pt-4 text-center sm:pt-5">

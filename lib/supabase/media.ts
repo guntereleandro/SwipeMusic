@@ -1,4 +1,6 @@
-import { getSupabaseClient } from "@/lib/supabase/client";
+import { getSupabaseClient } from "./client";
+
+export const DEFAULT_COVER_URL = "/covers/default.svg";
 
 function isReadyUrl(path: string) {
   return path.startsWith("/") || /^https?:\/\//i.test(path);
@@ -10,8 +12,10 @@ export function getAudioUrl(path: string) {
 }
 
 export function getCoverUrl(path: string | null) {
-  if (!path) return "/covers/default.svg";
-  if (isReadyUrl(path)) return path;
+  const normalizedPath = path?.trim();
 
-  return getSupabaseClient().storage.from("covers").getPublicUrl(path).data.publicUrl;
+  if (!normalizedPath) return DEFAULT_COVER_URL;
+  if (isReadyUrl(normalizedPath)) return normalizedPath;
+
+  return getSupabaseClient().storage.from("covers").getPublicUrl(normalizedPath).data.publicUrl;
 }
