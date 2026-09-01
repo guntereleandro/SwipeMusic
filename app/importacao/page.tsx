@@ -13,7 +13,10 @@ export default async function ImportacaoPage() {
       <div className="mx-auto w-full max-w-[1500px]">
         <header className="flex flex-wrap items-start justify-between gap-4">
           <div>
-            <Link href="/" className="text-xs font-semibold text-amber-400 transition hover:text-amber-300">← Voltar para avaliação</Link>
+            <nav className="flex flex-wrap gap-3 text-xs font-semibold" aria-label="Navegação principal">
+              <Link href="/" className="text-amber-400 transition hover:text-amber-300">← Avaliar músicas</Link>
+              <Link href="/admin" className="text-zinc-500 transition hover:text-amber-300">Admin</Link>
+            </nav>
             <h1 className="mt-3 text-2xl font-bold tracking-tight sm:text-3xl">Revisão do plano de importação</h1>
             <p className="mt-1 max-w-2xl text-sm leading-6 text-zinc-500">Visualização somente leitura. Esta tela não importa, exclui ou modifica músicas.</p>
           </div>

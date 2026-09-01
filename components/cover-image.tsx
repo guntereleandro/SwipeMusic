@@ -7,13 +7,14 @@ import { DEFAULT_COVER_URL } from "../lib/supabase/media";
 type CoverImageProps = {
   src: string;
   title: string;
+  priority?: boolean;
 };
 
 export function resolveCoverSourceAfterError(currentSrc: string) {
   return currentSrc === DEFAULT_COVER_URL ? currentSrc : DEFAULT_COVER_URL;
 }
 
-export function CoverImage({ src, title }: CoverImageProps) {
+export function CoverImage({ src, title, priority = false }: CoverImageProps) {
   const [currentSrc, setCurrentSrc] = useState(src || DEFAULT_COVER_URL);
 
   return (
@@ -22,7 +23,7 @@ export function CoverImage({ src, title }: CoverImageProps) {
       alt={`Capa de ${title}`}
       draggable={false}
       fill
-      priority
+      priority={priority}
       sizes="(max-width: 640px) calc(100vw - 48px), 428px"
       className="object-cover"
       onError={() => {
