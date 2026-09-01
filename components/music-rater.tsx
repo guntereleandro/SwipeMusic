@@ -14,6 +14,11 @@ import {
 import { listSongs } from "@/lib/supabase/repositories/songs";
 import { getAudioUrl, getCoverUrl } from "@/lib/supabase/media";
 import { getLibraryProgress } from "@/lib/music/library";
+import {
+  continuousPlaybackAfterManualAction,
+  INITIAL_CONTINUOUS_PLAYBACK,
+  shouldAutoPlayReplacement,
+} from "@/lib/music/continuous-playback";
 import type { Rating, Song, SongStatus } from "@/types/song";
 
 type OperationError = {
@@ -58,6 +63,9 @@ export function MusicRater() {
   const [history, setHistory] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+  const [continuousPlaybackEnabled, setContinuousPlaybackEnabled] = useState(
+    INITIAL_CONTINUOUS_PLAYBACK,
+  );
   const [error, setError] = useState<OperationError | null>(null);
 
   const currentSong = songs.find((song) => song.status === "PENDING");
@@ -210,6 +218,12 @@ export function MusicRater() {
               key={currentSong.id}
               song={currentSong}
               disabled={isSaving}
+              autoPlayOnMount={shouldAutoPlayReplacement(continuousPlaybackEnabled)}
+              onManualPlaybackChange={(isPlaying) =>
+                setContinuousPlaybackEnabled(
+                  continuousPlaybackAfterManualAction(isPlaying ? "PLAY" : "PAUSE"),
+                )
+              }
               onSwipe={rateCurrentSong}
             >
               <RatingActions disabled={isSaving} onRate={rateCurrentSong} />

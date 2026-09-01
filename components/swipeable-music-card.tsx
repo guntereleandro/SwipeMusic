@@ -8,6 +8,8 @@ import type { Rating, Song } from "@/types/song";
 type SwipeableMusicCardProps = {
   song: Song;
   disabled?: boolean;
+  autoPlayOnMount: boolean;
+  onManualPlaybackChange: (isPlaying: boolean) => void;
   onSwipe: (rating: Extract<Rating, "LIKE" | "DISLIKE">) => Promise<boolean>;
   children: ReactNode;
 };
@@ -15,6 +17,8 @@ type SwipeableMusicCardProps = {
 export function SwipeableMusicCard({
   song,
   disabled = false,
+  autoPlayOnMount,
+  onManualPlaybackChange,
   onSwipe,
   children,
 }: SwipeableMusicCardProps) {
@@ -56,7 +60,11 @@ export function SwipeableMusicCard({
         Não gosto
       </div>
 
-      <MusicCard song={song}>
+      <MusicCard
+        song={song}
+        autoPlayOnMount={autoPlayOnMount}
+        onManualPlaybackChange={onManualPlaybackChange}
+      >
         {children}
       </MusicCard>
 

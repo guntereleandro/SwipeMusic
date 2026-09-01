@@ -5,10 +5,17 @@ import type { Song } from "@/types/song";
 
 type MusicCardProps = {
   song: Song;
+  autoPlayOnMount: boolean;
+  onManualPlaybackChange: (isPlaying: boolean) => void;
   children: ReactNode;
 };
 
-export function MusicCard({ song, children }: MusicCardProps) {
+export function MusicCard({
+  song,
+  autoPlayOnMount,
+  onManualPlaybackChange,
+  children,
+}: MusicCardProps) {
   return (
     <article className="overflow-hidden rounded-[1.75rem] border border-white/[0.08] bg-[#1c1c1f] p-3 shadow-[0_24px_70px_-28px_rgba(0,0,0,0.8)] sm:p-4">
       <div className="relative aspect-square overflow-hidden rounded-[1.25rem] bg-zinc-800 shadow-[0_12px_35px_-18px_rgba(0,0,0,0.9)]">
@@ -29,7 +36,13 @@ export function MusicCard({ song, children }: MusicCardProps) {
         data-swipe-ignore="true"
         style={{ touchAction: "auto" }}
       >
-        <AudioPlayer key={song.id} src={song.audioUrl} title={song.title} />
+        <AudioPlayer
+          key={song.id}
+          src={song.audioUrl}
+          title={song.title}
+          autoPlayOnMount={autoPlayOnMount}
+          onManualPlaybackChange={onManualPlaybackChange}
+        />
       </div>
 
       <div

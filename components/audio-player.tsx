@@ -1,11 +1,14 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { PauseIcon, PlayIcon } from "@/components/icons";
+import { isCurrentPlaybackRequest } from "@/lib/music/continuous-playback";
 
 type AudioPlayerProps = {
   src: string;
   title: string;
+  autoPlayOnMount: boolean;
+  onManualPlaybackChange: (isPlaying: boolean) => void;
 };
 
 function formatTime(seconds: number) {
@@ -16,25 +19,95 @@ function formatTime(seconds: number) {
   return `${minutes}:${remainingSeconds.toString().padStart(2, "0")}`;
 }
 
-export function AudioPlayer({ src, title }: AudioPlayerProps) {
+export function AudioPlayer({
+  src,
+  title,
+  autoPlayOnMount,
+  onManualPlaybackChange,
+}: AudioPlayerProps) {
   const audioRef = useRef<HTMLAudioElement>(null);
+  const autoPlayOnMountRef = useRef(autoPlayOnMount);
+  const playbackRequestRef = useRef(0);
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
   const [hasError, setHasError] = useState(false);
   const progress = duration ? (currentTime / duration) * 100 : 0;
 
+  useEffect(() => {
+    const audio = audioRef.current;
+    if (!audio) return;
+
+    let cancelled = false;
+    const requestId = ++playbackRequestRef.current;
+
+    async function startFromBeginning() {
+      const currentAudio = audioRef.current;
+      if (
+        !currentAudio ||
+        currentAudio !== audio ||
+        !isCurrentPlaybackRequest(requestId, playbackRequestRef.current, cancelled)
+      ) {
+        return;
+      }
+
+      currentAudio.currentTime = 0;
+
+      try {
+        await currentAudio.play();
+        if (!isCurrentPlaybackRequest(requestId, playbackRequestRef.current, cancelled)) {
+          currentAudio.pause();
+        }
+      } catch {
+        if (isCurrentPlaybackRequest(requestId, playbackRequestRef.current, cancelled)) {
+          setIsPlaying(false);
+        }
+      }
+    }
+
+    if (autoPlayOnMountRef.current) {
+      if (audio.readyState >= 2) {
+        void startFromBeginning();
+      } else {
+        audio.addEventListener("canplay", startFromBeginning, { once: true });
+      }
+    }
+
+    return () => {
+      cancelled = true;
+      playbackRequestRef.current += 1;
+      audio.removeEventListener("canplay", startFromBeginning);
+      audio.pause();
+      audio.currentTime = 0;
+    };
+  }, [src]);
+
   async function togglePlayback() {
     const audio = audioRef.current;
     if (!audio) return;
 
     if (audio.paused) {
+      const requestId = ++playbackRequestRef.current;
+      onManualPlaybackChange(true);
       try {
         await audio.play();
+        if (
+          audioRef.current !== audio ||
+          !isCurrentPlaybackRequest(requestId, playbackRequestRef.current, false)
+        ) {
+          audio.pause();
+        }
       } catch {
-        setHasError(true);
+        if (
+          audioRef.current === audio &&
+          isCurrentPlaybackRequest(requestId, playbackRequestRef.current, false)
+        ) {
+          setIsPlaying(false);
+        }
       }
     } else {
+      playbackRequestRef.current += 1;
+      onManualPlaybackChange(false);
       audio.pause();
     }
   }
