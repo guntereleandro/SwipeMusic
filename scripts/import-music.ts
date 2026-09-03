@@ -8,6 +8,8 @@ import { parseFile, type IPicture } from "music-metadata";
 import type { Database } from "../lib/supabase/database.types";
 import { analyzeLibrary } from "./music-analysis/analyze-library";
 import { buildImportPlan, type ImportPlan } from "./music-import/import-plan";
+import { createResumePlan, type ResumePlan } from "./music-import/resume-plan";
+import { listAllStorageObjects } from "./music-reset/library-reset";
 
 const MUSIC_BUCKET = "music";
 const COVERS_BUCKET = "covers";
@@ -53,10 +55,11 @@ function formatBytes(bytes: number) {
   return `${value.toLocaleString("pt-BR", { maximumFractionDigits: 1 })} ${units[unit]}`;
 }
 
-async function confirmImport(plan: ImportPlan) {
+async function confirmImport(plan: ImportPlan, resumePlan: ResumePlan) {
   console.log("\nATENÇÃO: esta etapa fará uploads e inserts reais.");
-  console.log(`Plano: ${plan.summary.files_to_import.toLocaleString("pt-BR")} músicas`);
-  console.log(`Envio estimado: ${formatBytes(plan.summary.estimated_upload_bytes)}`);
+  console.log(`Já importadas: ${resumePlan.alreadyImported.length.toLocaleString("pt-BR")}`);
+  console.log(`Ainda faltando: ${resumePlan.missing.length.toLocaleString("pt-BR")}`);
+  console.log(`Uploads de áudio necessários: ${resumePlan.uploadsRequired.toLocaleString("pt-BR")}`);
   console.log("Digite IMPORTAR para continuar.");
 
   const prompt = createInterface({ input, output });
@@ -67,18 +70,65 @@ async function confirmImport(plan: ImportPlan) {
   }
 }
 
-async function runRealImport(root: string, plan: ImportPlan) {
-  if (!(await confirmImport(plan))) {
+async function readRemoteState(supabase: ReturnType<typeof createServiceClient>) {
+  const hashes = new Set<string>();
+  for (let from = 0; ; from += 1_000) {
+    const { data, error } = await supabase.from("songs").select("file_hash").range(from, from + 999);
+    if (error) throw error;
+    for (const song of data) if (song.file_hash) hashes.add(song.file_hash);
+    if (data.length < 1_000) break;
+  }
+  const music = supabase.storage.from(MUSIC_BUCKET);
+  const covers = supabase.storage.from(COVERS_BUCKET);
+  const listBucket = (storage: typeof music) => listAllStorageObjects(async (prefix, options) => {
+    const { data, error } = await storage.list(prefix, { ...options, sortBy: { column: "name", order: "asc" } });
+    if (error) throw error;
+    return data;
+  });
+  const [musicObjects, coverObjects] = await Promise.all([listBucket(music), listBucket(covers)]);
+  return { hashes, musicObjects: new Set(musicObjects), coverObjects: new Set(coverObjects) };
+}
+
+function createServiceClient() {
+  return createClient<Database>(
+    requireEnvironment("NEXT_PUBLIC_SUPABASE_URL"),
+    requireEnvironment("SUPABASE_SERVICE_ROLE_KEY"),
+    { auth: { autoRefreshToken: false, persistSession: false } },
+  );
+}
+
+async function buildResumePlan(plan: ImportPlan, supabase: ReturnType<typeof createServiceClient>) {
+  const remote = await readRemoteState(supabase);
+  return { resumePlan: createResumePlan(plan.to_import, remote.hashes, remote.musicObjects, remote.coverObjects), remote };
+}
+
+function printResumePlan(plan: ImportPlan, resumePlan: ResumePlan) {
+  console.log("\n===================================");
+  console.log("SWIPEMUSIC — PLANO DE RETOMADA");
+  console.log("===================================\n");
+  console.log(`Arquivos analisados:               ${plan.summary.files_found.toLocaleString("pt-BR")}`);
+  console.log(`Músicas previstas no plano local:  ${plan.summary.files_to_import.toLocaleString("pt-BR")}`);
+  console.log(`Já importadas no Supabase:         ${resumePlan.alreadyImported.length.toLocaleString("pt-BR")}`);
+  console.log(`Ainda faltando:                    ${resumePlan.missing.length.toLocaleString("pt-BR")}`);
+  console.log(`Uploads de áudio necessários:      ${resumePlan.uploadsRequired.toLocaleString("pt-BR")}`);
+  console.log(`Áudios órfãos que serão reusados:  ${resumePlan.orphanAudioPaths.length.toLocaleString("pt-BR")}`);
+  console.log(`Capas órfãs que serão reusadas:    ${resumePlan.orphanCoverPaths.length.toLocaleString("pt-BR")}`);
+  console.log("\nNenhum upload, insert ou remoção foi executado.");
+}
+
+async function runRealImport(
+  root: string,
+  plan: ImportPlan,
+  supabase: ReturnType<typeof createServiceClient>,
+  resumePlan: ResumePlan,
+  existingCoverObjects: ReadonlySet<string>,
+) {
+  if (!(await confirmImport(plan, resumePlan))) {
     console.log("Importação cancelada. Nenhum upload ou insert foi executado.");
     return;
   }
 
   const startedAt = Date.now();
-  const supabase = createClient<Database>(
-    requireEnvironment("NEXT_PUBLIC_SUPABASE_URL"),
-    requireEnvironment("SUPABASE_SERVICE_ROLE_KEY"),
-    { auth: { autoRefreshToken: false, persistSession: false } },
-  );
   const fileByPath = new Map(plan.files.map((file) => [file.relative_path, file]));
   const results: Array<{
     relative_path: string;
@@ -90,12 +140,13 @@ async function runRealImport(root: string, plan: ImportPlan) {
   let errors = 0;
   let bytesSent = 0;
 
-  for (const [index, decision] of plan.to_import.entries()) {
+  for (const [index, decision] of resumePlan.missing.entries()) {
     const file = fileByPath.get(decision.relative_path)!;
     const absolutePath = resolve(root, ...decision.relative_path.split("/"));
-    console.log(`\n[${index + 1}/${plan.to_import.length}] ${decision.relative_path}`);
+    console.log(`\n[${index + 1}/${resumePlan.missing.length}] ${decision.relative_path}`);
     let uploadedAudio: string | null = null;
     let uploadedCover: string | null = null;
+    let resolvedCoverPath: string | null = null;
 
     try {
       if (!file.file_hash) throw new Error("SHA-256 indisponível; arquivo preservado para revisão.");
@@ -120,27 +171,36 @@ async function runRealImport(root: string, plan: ImportPlan) {
       }
       const pictureExtension = picture ? coverExtension(picture) : null;
       const audioPath = `${file.file_hash}.mp3`;
-      const audioBytes = await readFile(absolutePath);
-      const { error: audioError } = await supabase.storage.from(MUSIC_BUCKET).upload(
-        audioPath,
-        audioBytes,
-        { contentType: "audio/mpeg", upsert: true },
-      );
-      if (audioError) throw audioError;
-      uploadedAudio = audioPath;
-      bytesSent += audioBytes.byteLength;
+      if (decision.audio_upload_required) {
+        const audioBytes = await readFile(absolutePath);
+        const { error: audioError } = await supabase.storage.from(MUSIC_BUCKET).upload(
+          audioPath,
+          audioBytes,
+          { contentType: "audio/mpeg", upsert: false },
+        );
+        if (audioError) throw audioError;
+        uploadedAudio = audioPath;
+        bytesSent += audioBytes.byteLength;
+      } else {
+        console.log("→ áudio órfão já presente no Storage; upload dispensado");
+      }
 
       if (picture && pictureExtension) {
         const coverPath = `${file.file_hash}.${pictureExtension}`;
-        const coverBytes = Buffer.from(picture.data);
-        const { error: coverError } = await supabase.storage.from(COVERS_BUCKET).upload(
-          coverPath,
-          coverBytes,
-          { contentType: coverContentType(pictureExtension), upsert: true },
-        );
-        if (coverError) throw coverError;
-        uploadedCover = coverPath;
-        bytesSent += coverBytes.byteLength;
+        resolvedCoverPath = coverPath;
+        if (existingCoverObjects.has(coverPath)) {
+          console.log("→ capa órfã já presente no Storage; upload dispensado");
+        } else {
+          const coverBytes = Buffer.from(picture.data);
+          const { error: coverError } = await supabase.storage.from(COVERS_BUCKET).upload(
+            coverPath,
+            coverBytes,
+            { contentType: coverContentType(pictureExtension), upsert: false },
+          );
+          if (coverError) throw coverError;
+          uploadedCover = coverPath;
+          bytesSent += coverBytes.byteLength;
+        }
       }
 
       const fallbackTitle = basename(absolutePath, extname(absolutePath));
@@ -151,7 +211,7 @@ async function runRealImport(root: string, plan: ImportPlan) {
         original_filename: file.original_filename,
         source_folder: file.source_folder,
         audio_path: audioPath,
-        cover_path: uploadedCover,
+        cover_path: resolvedCoverPath,
         file_hash: file.file_hash,
         duration_seconds: file.duration_seconds,
         bitrate: file.bitrate,
@@ -224,8 +284,13 @@ async function main() {
   }
 
   const plan = await buildImportPlan(root, true);
-  if (planMode) return;
-  await runRealImport(root, plan);
+  const supabase = createServiceClient();
+  const { resumePlan, remote } = await buildResumePlan(plan, supabase);
+  if (planMode) {
+    printResumePlan(plan, resumePlan);
+    return;
+  }
+  await runRealImport(root, plan, supabase, resumePlan, remote.coverObjects);
 }
 
 main().catch((error: unknown) => {

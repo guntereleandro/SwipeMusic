@@ -9,9 +9,11 @@
     "lint": "eslint",
     "import-music": "tsx scripts/import-music.ts",
     "analyze-music": "tsx scripts/import-music.ts --dry-run",
+    "reset-music-library": "tsx scripts/reset-music-library.ts",
     "test": "vitest run"
   },
   "dependencies": {
+    "@supabase/ssr": "^0.12.5",
     "@supabase/supabase-js": "^2.112.4",
     "dotenv": "^17.4.2",
     "music-metadata": "^11.15.0",

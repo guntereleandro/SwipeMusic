@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { CheckIcon, UndoIcon } from "@/components/icons";
 import { RatingActions } from "@/components/rating-actions";
@@ -187,8 +186,6 @@ export function MusicRater() {
             </h1>
           </div>
           <div className="flex items-center gap-3">
-            <Link href="/admin" className="text-[11px] font-semibold text-zinc-500 transition hover:text-amber-300 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-500">Admin</Link>
-            <Link href="/importacao" className="text-[11px] font-semibold text-zinc-500 transition hover:text-amber-300 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-500">Importação</Link>
             <p className="text-xs font-medium tabular-nums text-zinc-400" aria-live="polite">
               <strong className="text-zinc-100">{progress.evaluated}</strong> de {progress.total}{" "}
               avaliadas
@@ -216,7 +213,6 @@ export function MusicRater() {
         ) : currentSong ? (
           <div className="flex flex-1 flex-col justify-center">
             <SwipeableMusicCard
-              key={currentSong.id}
               song={currentSong}
               disabled={isSaving}
               autoPlayOnMount={shouldAutoPlayReplacement(continuousPlaybackEnabled)}

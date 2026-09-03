@@ -53,6 +53,8 @@ revoke all on table public.ratings from anon, authenticated;
 
 grant select on table public.songs to anon;
 grant select, insert, delete on table public.ratings to anon;
+grant select on table public.songs to authenticated;
+grant select on table public.ratings to authenticated;
 
 drop policy if exists "MVP anon can read songs" on public.songs;
 create policy "MVP anon can read songs"
@@ -80,6 +82,20 @@ create policy "MVP anon can delete ratings"
   on public.ratings
   for delete
   to anon
+  using (true);
+
+drop policy if exists "MVP authenticated can read songs" on public.songs;
+create policy "MVP authenticated can read songs"
+  on public.songs
+  for select
+  to authenticated
+  using (true);
+
+drop policy if exists "MVP authenticated can read ratings" on public.ratings;
+create policy "MVP authenticated can read ratings"
+  on public.ratings
+  for select
+  to authenticated
   using (true);
 
 -- Storage used by the local importer. No anon upload/update/delete policies are

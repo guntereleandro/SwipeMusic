@@ -35,52 +35,56 @@ export function AudioPlayer({
   const progress = duration ? (currentTime / duration) * 100 : 0;
 
   useEffect(() => {
+    autoPlayOnMountRef.current = autoPlayOnMount;
+  }, [autoPlayOnMount]);
+
+  useEffect(() => {
     const audio = audioRef.current;
     if (!audio) return;
 
-    let cancelled = false;
     const requestId = ++playbackRequestRef.current;
 
-    async function startFromBeginning() {
+    async function startReplacement() {
       const currentAudio = audioRef.current;
       if (
         !currentAudio ||
         currentAudio !== audio ||
-        !isCurrentPlaybackRequest(requestId, playbackRequestRef.current, cancelled)
+        !isCurrentPlaybackRequest(requestId, playbackRequestRef.current, false)
       ) {
         return;
       }
 
-      currentAudio.currentTime = 0;
-
       try {
         await currentAudio.play();
-        if (!isCurrentPlaybackRequest(requestId, playbackRequestRef.current, cancelled)) {
-          currentAudio.pause();
-        }
       } catch {
-        if (isCurrentPlaybackRequest(requestId, playbackRequestRef.current, cancelled)) {
+        if (isCurrentPlaybackRequest(requestId, playbackRequestRef.current, false)) {
           setIsPlaying(false);
         }
       }
     }
 
-    if (autoPlayOnMountRef.current) {
-      if (audio.readyState >= 2) {
-        void startFromBeginning();
-      } else {
-        audio.addEventListener("canplay", startFromBeginning, { once: true });
-      }
-    }
+    setCurrentTime(0);
+    setDuration(0);
+    setHasError(false);
+    setIsPlaying(false);
+    audio.pause();
+    audio.currentTime = 0;
+    audio.load();
+
+    // Keep this call in the same source-change task. WebKit grants playback per
+    // media element; waiting for canplay would defer it unnecessarily.
+    if (autoPlayOnMountRef.current) void startReplacement();
 
     return () => {
-      cancelled = true;
       playbackRequestRef.current += 1;
-      audio.removeEventListener("canplay", startFromBeginning);
-      audio.pause();
-      audio.currentTime = 0;
     };
   }, [src]);
+
+  useEffect(() => () => {
+    const audio = audioRef.current;
+    playbackRequestRef.current += 1;
+    audio?.pause();
+  }, []);
 
   async function togglePlayback() {
     const audio = audioRef.current;
@@ -91,12 +95,6 @@ export function AudioPlayer({
       onManualPlaybackChange(true);
       try {
         await audio.play();
-        if (
-          audioRef.current !== audio ||
-          !isCurrentPlaybackRequest(requestId, playbackRequestRef.current, false)
-        ) {
-          audio.pause();
-        }
       } catch {
         if (
           audioRef.current === audio &&
@@ -128,6 +126,7 @@ export function AudioPlayer({
       <audio
         ref={audioRef}
         src={src}
+        playsInline
         preload="metadata"
         onLoadedMetadata={(event) => {
           setDuration(event.currentTarget.duration);

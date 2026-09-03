@@ -37,7 +37,6 @@ export function MusicCard({
         style={{ touchAction: "auto" }}
       >
         <AudioPlayer
-          key={song.id}
           src={song.audioUrl}
           title={song.title}
           autoPlayOnMount={autoPlayOnMount}

@@ -21,6 +21,7 @@ export function CoverImage({ src, title, priority = false }: CoverImageProps) {
     <Image
       src={currentSrc}
       alt={`Capa de ${title}`}
+      unoptimized
       draggable={false}
       fill
       priority={priority}

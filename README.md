@@ -14,7 +14,7 @@ SwipeMusic é uma aplicação web mobile-first para avaliar músicas que já exi
 
 ## Fora do escopo atual
 
-Painel administrativo completo, autenticação, edição de metadados, exclusão automática do pendrive, recomendações, integrações com Spotify ou YouTube, descoberta musical, múltiplos usuários, playlists e funcionalidades sociais.
+Painel administrativo completo, edição de metadados, exclusão automática do pendrive, recomendações, integrações com Spotify ou YouTube, descoberta musical, múltiplos usuários, playlists e funcionalidades sociais.
 
 ## Tecnologias
 
@@ -67,9 +67,17 @@ Se as tabelas já existirem, execute novamente `supabase/schema.sql` no SQL Edit
 
 ### Aviso de segurança sobre RLS
 
-Este MVP não possui autenticação. As policies permitem que qualquer cliente com a publishable key leia músicas e leia, crie ou exclua avaliações. Isso atende ao uso privado com um único avaliador, mas **não é seguro para uma aplicação pública ou multiusuário**.
+As policies do banco ainda não exigem autenticação: qualquer cliente com a publishable key pode ler músicas e ler, criar ou excluir avaliações. Isso atende ao uso privado com um único avaliador, mas **não é seguro para uma aplicação pública ou multiusuário**.
 
 Antes de publicar amplamente ou adicionar múltiplos usuários, implemente autenticação e substitua as policies por regras vinculadas ao usuário. A publishable key não é um segredo; a segurança depende das policies e dos privilégios do banco.
+
+## Acesso administrativo
+
+As rotas `/admin` e `/importacao` exigem uma sessão Supabase Auth válida. A tela de avaliação `/` e a rota de reprodução de áudio continuam públicas. O MVP usa somente login por e-mail e senha, sem cadastro público ou recuperação de senha.
+
+Crie o único administrador manualmente em **Authentication > Users > Add user** no Supabase Dashboard. Use um e-mail real e uma senha forte; não é necessário adicionar novas variáveis de ambiente. Depois, acesse `/login`. A sessão é mantida em cookies pelo `@supabase/ssr`, e o botão **Sair** encerra a sessão.
+
+A autenticação protege as páginas administrativas, mas não muda as policies RLS simplificadas já usadas pelo fluxo público de avaliação. Antes de transformar o sistema em uma aplicação pública multiusuário, as policies também devem ser revistas e vinculadas a usuários/perfis autorizados.
 
 ## Importação local das músicas
 

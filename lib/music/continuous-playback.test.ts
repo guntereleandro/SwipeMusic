@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { readFile } from "node:fs/promises";
 import {
   continuousPlaybackAfterManualAction,
   INITIAL_CONTINUOUS_PLAYBACK,
@@ -46,5 +47,19 @@ describe("reprodução contínua", () => {
     expect(isCurrentPlaybackRequest(1, 2, false)).toBe(false);
     expect(isCurrentPlaybackRequest(2, 2, true)).toBe(false);
     expect(isCurrentPlaybackRequest(2, 2, false)).toBe(true);
+  });
+
+  it("mantém um único player entre músicas, sem keys dependentes da música", async () => {
+    const [rater, card, player] = await Promise.all([
+      readFile(new URL("../../components/music-rater.tsx", import.meta.url), "utf8"),
+      readFile(new URL("../../components/music-card.tsx", import.meta.url), "utf8"),
+      readFile(new URL("../../components/audio-player.tsx", import.meta.url), "utf8"),
+    ]);
+    expect(rater).not.toContain("key={currentSong.id}");
+    expect(card).not.toContain("key={song.id}");
+    expect(player.match(/<audio\b/g)).toHaveLength(1);
+    expect(player).toContain("audio.load()");
+    expect(player).toContain("playsInline");
+    expect(player).not.toContain('addEventListener("canplay"');
   });
 });

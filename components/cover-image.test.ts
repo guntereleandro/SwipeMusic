@@ -1,3 +1,4 @@
+import { readFile } from "node:fs/promises";
 import { describe, expect, it } from "vitest";
 import { resolveCoverSourceAfterError } from "./cover-image";
 
@@ -12,5 +13,12 @@ describe("fallback da imagem de capa", () => {
     expect(resolveCoverSourceAfterError("/covers/default.svg")).toBe(
       "/covers/default.svg",
     );
+  });
+});
+
+describe("carregamento da capa", () => {
+  it("usa a URL pública diretamente, sem o otimizador server-side", async () => {
+    const source = await readFile(new URL("./cover-image.tsx", import.meta.url), "utf8");
+    expect(source).toMatch(/<Image[\s\S]*?\bunoptimized\b/);
   });
 });

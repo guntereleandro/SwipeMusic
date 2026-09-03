@@ -120,13 +120,10 @@ export function useSwipeGesture({ disabled = false, onSwipe }: UseSwipeGestureOp
       setIsExiting(true);
       updateDrag(direction * exitDistance);
       exitTimer.current = setTimeout(async () => {
-        const saved = await onSwipeRef.current(rating);
-
-        if (!saved) {
-          isExitingRef.current = false;
-          setIsExiting(false);
-          updateDrag(0);
-        }
+        await onSwipeRef.current(rating);
+        isExitingRef.current = false;
+        setIsExiting(false);
+        updateDrag(0);
       }, EXIT_DURATION_MS);
     },
     [updateDrag],
