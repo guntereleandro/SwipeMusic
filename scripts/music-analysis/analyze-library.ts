@@ -78,7 +78,10 @@ export async function findMp3Files(directory: string): Promise<string[]> {
   const nested = await Promise.all(
     entries.map(async (entry) => {
       const entryPath = resolve(directory, entry.name);
-      if (entry.isDirectory()) return findMp3Files(entryPath);
+      if (entry.isDirectory()) {
+        if (entry.name.toLocaleLowerCase("pt-BR") === "_duplicatas_removidas") return [];
+        return findMp3Files(entryPath);
+      }
       return entry.isFile() && extname(entry.name).toLowerCase() === ".mp3" ? [entryPath] : [];
     }),
   );

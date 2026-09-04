@@ -9,6 +9,7 @@
     "lint": "eslint",
     "import-music": "tsx scripts/import-music.ts",
     "analyze-music": "tsx scripts/import-music.ts --dry-run",
+    "clean-music-folder": "tsx scripts/clean-music-folder.ts",
     "reset-music-library": "tsx scripts/reset-music-library.ts",
     "test": "vitest run"
   },
