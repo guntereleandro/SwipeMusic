@@ -11,7 +11,7 @@ import {
 
 function song(id: string, title: string, artist: string | null): SongRow {
   return {
-    id, title, artist, album: null, audio_path: `${id}.mp3`, cover_path: null,
+    id, library_id: "library", title, artist, album: null, audio_path: `${id}.mp3`, cover_path: null,
     created_at: "2026-08-31T10:00:00.000Z", duration_seconds: null, bitrate: null,
     sample_rate: null, metadata_status: null, metadata_review_required: false,
     file_hash: id, original_filename: `${id}.mp3`, source_folder: null,

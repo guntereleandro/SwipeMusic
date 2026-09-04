@@ -8,8 +8,8 @@ export function AdminNavigation({ current }: { current: "admin" | "importacao" }
 
   return (
     <nav className="flex flex-wrap gap-2" aria-label="Navegação administrativa">
-      <Link href="/" className={`${common} ${inactive}`}>Avaliar</Link>
-      <Link href="/admin" aria-current={current === "admin" ? "page" : undefined} className={`${common} ${current === "admin" ? active : inactive}`}>Admin</Link>
+      <Link href="/" className={`${common} ${inactive}`}>Bibliotecas públicas</Link>
+      <Link href="/admin" aria-current={current === "admin" ? "page" : undefined} className={`${common} ${current === "admin" ? active : inactive}`}>Bibliotecas</Link>
       <Link href="/importacao" aria-current={current === "importacao" ? "page" : undefined} className={`${common} ${current === "importacao" ? active : inactive}`}>Importação</Link>
       <form action={logoutAction}>
         <button type="submit" className={`${common} ${inactive}`}>Sair</button>

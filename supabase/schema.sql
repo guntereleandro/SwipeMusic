@@ -4,8 +4,20 @@
 
 create extension if not exists pgcrypto with schema extensions;
 
+create table if not exists public.libraries (
+  id uuid primary key default gen_random_uuid(),
+  name text not null,
+  slug text not null unique,
+  created_at timestamptz not null default now(),
+  constraint libraries_slug_format_check check (slug = lower(slug) and slug ~ '^[a-z0-9]+(?:-[a-z0-9]+)*$')
+);
+
+insert into public.libraries (name, slug) values ('Norair', 'norair')
+on conflict (slug) do update set name = excluded.name;
+
 create table if not exists public.songs (
   id uuid primary key default gen_random_uuid(),
+  library_id uuid not null references public.libraries(id) on delete restrict,
   title text not null,
   artist text null,
   album text null,
@@ -27,6 +39,19 @@ alter table public.songs add column if not exists bitrate integer null;
 alter table public.songs add column if not exists sample_rate integer null;
 alter table public.songs add column if not exists metadata_status text null;
 alter table public.songs add column if not exists metadata_review_required boolean not null default false;
+alter table public.songs add column if not exists library_id uuid null;
+update public.songs set library_id = (select id from public.libraries where slug = 'norair') where library_id is null;
+
+do $$
+begin
+  if exists (select 1 from public.songs where library_id is null) then
+    raise exception 'Schema update aborted: songs without library_id remain';
+  end if;
+  if not exists (select 1 from pg_constraint where conname = 'songs_library_id_fkey' and conrelid = 'public.songs'::regclass) then
+    alter table public.songs add constraint songs_library_id_fkey foreign key (library_id) references public.libraries(id) on delete restrict;
+  end if;
+end $$;
+alter table public.songs alter column library_id set not null;
 
 create table if not exists public.ratings (
   id uuid primary key default gen_random_uuid(),
@@ -37,24 +62,34 @@ create table if not exists public.ratings (
   constraint ratings_rating_check check (rating in ('LIKE', 'NEUTRAL', 'DISLIKE'))
 );
 
-create unique index if not exists songs_file_hash_unique_idx
-  on public.songs (file_hash)
+drop index if exists public.songs_file_hash_unique_idx;
+create unique index if not exists songs_library_file_hash_unique_idx
+  on public.songs (library_id, file_hash)
   where file_hash is not null;
 
 create index if not exists songs_created_at_idx on public.songs (created_at);
+create index if not exists songs_library_created_at_idx on public.songs (library_id, created_at, id);
 create index if not exists ratings_created_at_idx on public.ratings (created_at desc);
 create index if not exists ratings_rating_idx on public.ratings (rating);
 
+alter table public.libraries enable row level security;
 alter table public.songs enable row level security;
 alter table public.ratings enable row level security;
 
+revoke all on table public.libraries from anon, authenticated;
 revoke all on table public.songs from anon, authenticated;
 revoke all on table public.ratings from anon, authenticated;
 
+grant select on table public.libraries to anon;
 grant select on table public.songs to anon;
 grant select, insert, delete on table public.ratings to anon;
+grant select on table public.libraries to authenticated;
 grant select on table public.songs to authenticated;
 grant select on table public.ratings to authenticated;
+
+drop policy if exists "Public can read libraries" on public.libraries;
+create policy "Public can read libraries"
+  on public.libraries for select to anon, authenticated using (true);
 
 drop policy if exists "MVP anon can read songs" on public.songs;
 create policy "MVP anon can read songs"

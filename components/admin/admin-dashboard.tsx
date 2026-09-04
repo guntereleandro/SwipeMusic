@@ -25,13 +25,13 @@ type DashboardData = {
   stats: AdminStats;
 };
 
-async function fetchDashboardData(): Promise<DashboardData> {
-  const [songs, ratings] = await Promise.all([listSongs(), listRatings()]);
+async function fetchDashboardData(libraryId: string): Promise<DashboardData> {
+  const [songs, ratings] = await Promise.all([listSongs(libraryId), listRatings(libraryId)]);
   const items = joinRatingsWithSongs(songs, ratings);
   return { items, stats: calculateAdminStats(songs.length, items) };
 }
 
-export function AdminDashboard() {
+export function AdminDashboard({ libraryId }: { libraryId: string }) {
   const [data, setData] = useState<DashboardData | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -43,7 +43,7 @@ export function AdminDashboard() {
   useEffect(() => {
     let cancelled = false;
 
-    void fetchDashboardData()
+    void fetchDashboardData(libraryId)
       .then((result) => {
         if (cancelled) return;
         setData(result);
@@ -59,7 +59,7 @@ export function AdminDashboard() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [libraryId]);
 
   const filteredItems = useMemo(() => {
     if (!data) return [];
@@ -72,7 +72,7 @@ export function AdminDashboard() {
     setIsLoading(true);
     setError(null);
     try {
-      setData(await fetchDashboardData());
+      setData(await fetchDashboardData(libraryId));
     } catch (loadError) {
       setError(loadError instanceof Error ? loadError.message : "Não foi possível carregar o painel.");
     } finally {

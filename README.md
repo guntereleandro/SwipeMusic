@@ -97,10 +97,10 @@ Antes de executar:
 Antes da execução real, gere o plano completo:
 
 ```powershell
-npm.cmd run import-music -- "E:\Musicas" --plan
+npm.cmd run import-music -- "E:\Musicas" --library norair --plan
 ```
 
-Esse modo não cria cliente Supabase, não faz upload ou insert e não altera os MP3s. Ele gera:
+Esse modo valida a biblioteca no Supabase, mas não faz upload ou insert e não altera os MP3s. Ele gera:
 
 - `reports/import-plan-YYYY-MM-DD-HHmmss.json`;
 - `reports/import-plan-YYYY-MM-DD-HHmmss.csv`.
@@ -112,7 +112,7 @@ O plano importa um representante por SHA-256 e por grupo `LIKELY_DUPLICATE`. O r
 Exemplo no Windows PowerShell:
 
 ```powershell
-npm.cmd run import-music -- "E:\Musicas"
+npm.cmd run import-music -- "E:\Musicas" --library norair
 ```
 
 Depois de montar e mostrar o plano, o comando exige que o administrador digite exatamente `IMPORTAR`. Qualquer outra entrada cancela sem upload ou insert.
@@ -120,10 +120,10 @@ Depois de montar e mostrar o plano, o comando exige que o administrador digite e
 Também é possível executar diretamente:
 
 ```powershell
-pnpm tsx scripts/import-music.ts "E:\MusicasVan"
+pnpm tsx scripts/import-music.ts "E:\MusicasVan" --library norair
 ```
 
-Para cada arquivo, o script mostra progresso e resultado. Uma música cujo SHA-256 já exista em `songs.file_hash` é marcada como `skipped_duplicate`: não há novo upload nem novo registro. Falhas individuais não interrompem os próximos arquivos.
+Para cada arquivo, o script mostra progresso e resultado. Uma música cujo SHA-256 já exista na mesma biblioteca é marcada como `skipped_duplicate`; a mesma hash pode existir em outra biblioteca. Falhas individuais não interrompem os próximos arquivos.
 
 No banco, `source_folder` é relativo à raiz informada. Por exemplo, `E:\MusicasVan\Sertanejo\Antigas\musica.mp3` produz `Sertanejo/Antigas`; nenhum caminho absoluto do computador é salvo em `songs`. `audio_path` e `cover_path` guardam somente o nome baseado no hash dentro de seus respectivos buckets, nunca uma URL assinada.
 
@@ -134,22 +134,22 @@ Ao final, o terminal mostra encontrados, importados, duplicados, sem artista, se
 Antes da primeira importação real, execute somente a análise:
 
 ```powershell
-pnpm analyze-music "E:\MusicasVan"
+pnpm analyze-music "E:\MusicasVan" --library norair
 ```
 
 Com npm:
 
 ```powershell
-npm run analyze-music -- "E:\MusicasVan"
+npm run analyze-music -- "E:\MusicasVan" --library norair
 ```
 
 O comando equivalente é:
 
 ```powershell
-pnpm import-music "E:\MusicasVan" --dry-run
+pnpm import-music "E:\MusicasVan" --library norair --dry-run
 ```
 
-O modo de análise não precisa acessar o Supabase e não faz upload, insert, alteração de ID3, exclusão, movimentação ou renomeação. Ele apenas lê os MP3s e gera:
+O modo de análise apenas valida a existência da biblioteca no Supabase; não faz upload, insert, alteração de ID3, exclusão, movimentação ou renomeação. Ele lê os MP3s e gera:
 
 - `reports/library-analysis-v2-YYYY-MM-DD-HHmmss.json`, com resumo, arquivos e grupos;
 - `reports/library-analysis-v2-YYYY-MM-DD-HHmmss.csv`, com uma linha por arquivo e BOM UTF-8 para abertura amigável no Excel.

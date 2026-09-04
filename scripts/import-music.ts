@@ -10,6 +10,7 @@ import { analyzeLibrary } from "./music-analysis/analyze-library";
 import { buildImportPlan, type ImportPlan } from "./music-import/import-plan";
 import { createResumePlan, type ResumePlan } from "./music-import/resume-plan";
 import { listAllStorageObjects } from "./music-reset/library-reset";
+import { positionalArguments, requireLibrarySlug, resolveRequiredLibrary } from "../lib/libraries/library-scope";
 
 const MUSIC_BUCKET = "music";
 const COVERS_BUCKET = "covers";
@@ -70,10 +71,10 @@ async function confirmImport(plan: ImportPlan, resumePlan: ResumePlan) {
   }
 }
 
-async function readRemoteState(supabase: ReturnType<typeof createServiceClient>) {
+async function readRemoteState(supabase: ReturnType<typeof createServiceClient>, libraryId: string) {
   const hashes = new Set<string>();
   for (let from = 0; ; from += 1_000) {
-    const { data, error } = await supabase.from("songs").select("file_hash").range(from, from + 999);
+    const { data, error } = await supabase.from("songs").select("file_hash").eq("library_id", libraryId).range(from, from + 999);
     if (error) throw error;
     for (const song of data) if (song.file_hash) hashes.add(song.file_hash);
     if (data.length < 1_000) break;
@@ -97,8 +98,8 @@ function createServiceClient() {
   );
 }
 
-async function buildResumePlan(plan: ImportPlan, supabase: ReturnType<typeof createServiceClient>) {
-  const remote = await readRemoteState(supabase);
+async function buildResumePlan(plan: ImportPlan, supabase: ReturnType<typeof createServiceClient>, libraryId: string) {
+  const remote = await readRemoteState(supabase, libraryId);
   return { resumePlan: createResumePlan(plan.to_import, remote.hashes, remote.musicObjects, remote.coverObjects), remote };
 }
 
@@ -122,6 +123,7 @@ async function runRealImport(
   supabase: ReturnType<typeof createServiceClient>,
   resumePlan: ResumePlan,
   existingCoverObjects: ReadonlySet<string>,
+  libraryId: string,
 ) {
   if (!(await confirmImport(plan, resumePlan))) {
     console.log("Importação cancelada. Nenhum upload ou insert foi executado.");
@@ -153,6 +155,7 @@ async function runRealImport(
       const { data: existing, error: lookupError } = await supabase
         .from("songs")
         .select("id")
+        .eq("library_id", libraryId)
         .eq("file_hash", file.file_hash)
         .maybeSingle();
       if (lookupError) throw lookupError;
@@ -205,6 +208,7 @@ async function runRealImport(
 
       const fallbackTitle = basename(absolutePath, extname(absolutePath));
       const { error: insertError } = await supabase.from("songs").insert({
+        library_id: libraryId,
         title: file.resolved_title ?? fallbackTitle,
         artist: file.resolved_artist,
         album: file.resolved_album,
@@ -269,28 +273,35 @@ async function main() {
   const args = process.argv.slice(2);
   const dryRun = args.includes("--dry-run");
   const planMode = args.includes("--plan");
-  const rootArgument = args.find((argument) => !argument.startsWith("--"));
+  const librarySlug = requireLibrarySlug(args);
+  const rootArgument = positionalArguments(args)[0];
   if (!rootArgument) {
-    throw new Error('Informe a pasta raiz. Exemplo: npm run import-music -- "E:\\Musicas" --plan');
+    throw new Error('Informe a pasta raiz. Exemplo: npm.cmd run import-music -- "E:\\Musicas" --library norair');
   }
 
   const root = resolve(rootArgument);
   const rootStats = await stat(root).catch(() => null);
   if (!rootStats?.isDirectory()) throw new Error(`Pasta não encontrada: ${root}`);
 
+  const supabase = createServiceClient();
+  const library = await resolveRequiredLibrary(librarySlug, async (slug) => {
+    const { data, error } = await supabase.from("libraries").select("id, slug").eq("slug", slug).maybeSingle();
+    if (error) throw error;
+    return data;
+  });
   if (dryRun) {
+    console.log(`Biblioteca de destino: ${library.slug}`);
     await analyzeLibrary(root);
     return;
   }
 
   const plan = await buildImportPlan(root, true);
-  const supabase = createServiceClient();
-  const { resumePlan, remote } = await buildResumePlan(plan, supabase);
+  const { resumePlan, remote } = await buildResumePlan(plan, supabase, library.id);
   if (planMode) {
     printResumePlan(plan, resumePlan);
     return;
   }
-  await runRealImport(root, plan, supabase, resumePlan, remote.coverObjects);
+  await runRealImport(root, plan, supabase, resumePlan, remote.coverObjects, library.id);
 }
 
 main().catch((error: unknown) => {

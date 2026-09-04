@@ -43,8 +43,8 @@ function toSong(song: SongRow, rating?: RatingRow): Song {
   };
 }
 
-async function fetchMusicLibrary() {
-  const [songRows, ratingRows] = await Promise.all([listSongs(), listRatings()]);
+async function fetchMusicLibrary(libraryId: string) {
+  const [songRows, ratingRows] = await Promise.all([listSongs(libraryId), listRatings(libraryId)]);
   const ratingBySongId = new Map(ratingRows.map((rating) => [rating.song_id, rating]));
 
   const songs = songRows.map((song) => toSong(song, ratingBySongId.get(song.id)));
@@ -61,7 +61,7 @@ function getErrorMessage(error: unknown, fallback: string) {
   return error instanceof Error ? error.message : fallback;
 }
 
-export function MusicRater() {
+export function MusicRater({ libraryId, libraryName }: { libraryId: string; libraryName: string }) {
   const operationLock = useRef(false);
   const [songs, setSongs] = useState<Song[]>([]);
   const [history, setHistory] = useState<string[]>([]);
@@ -80,7 +80,7 @@ export function MusicRater() {
     setError(null);
 
     try {
-      const library = await fetchMusicLibrary();
+      const library = await fetchMusicLibrary(libraryId);
       setSongs(library.songs);
       setHistory(library.history);
     } catch (loadError) {
@@ -91,12 +91,12 @@ export function MusicRater() {
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [libraryId]);
 
   useEffect(() => {
     let cancelled = false;
 
-    void fetchMusicLibrary()
+    void fetchMusicLibrary(libraryId)
       .then((library) => {
         if (cancelled) return;
         setSongs(library.songs);
@@ -116,7 +116,7 @@ export function MusicRater() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [libraryId]);
 
   async function rateCurrentSong(rating: Rating): Promise<boolean> {
     if (!currentSong || operationLock.current) return false;
@@ -126,7 +126,7 @@ export function MusicRater() {
     setError(null);
 
     try {
-      await saveRating(currentSong.id, rating);
+      await saveRating(currentSong.id, rating, libraryId);
       setSongs((currentSongs) =>
         currentSongs.map((song) =>
           song.id === currentSong.id ? { ...song, status: rating } : song,
@@ -154,7 +154,7 @@ export function MusicRater() {
     setError(null);
 
     try {
-      const undoneRating = await deleteLastRating();
+      const undoneRating = await deleteLastRating(libraryId);
       if (!undoneRating) return;
 
       setSongs((currentSongs) => restoreSongForUndo(currentSongs, undoneRating.song_id));
@@ -179,7 +179,7 @@ export function MusicRater() {
               S
             </span>
             <h1 className="text-[15px] font-bold tracking-tight text-zinc-100">
-              SwipeMusic
+              {libraryName}
             </h1>
           </div>
           <div className="flex items-center gap-3">

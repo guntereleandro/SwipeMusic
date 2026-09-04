@@ -9,6 +9,12 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
+      libraries: {
+        Row: { id: string; name: string; slug: string; created_at: string };
+        Insert: { id?: string; name: string; slug: string; created_at?: string };
+        Update: { id?: string; name?: string; slug?: string; created_at?: string };
+        Relationships: [];
+      };
       songs: {
         Row: {
           album: string | null;
@@ -23,6 +29,7 @@ export type Database = {
           metadata_review_required: boolean;
           file_hash: string | null;
           id: string;
+          library_id: string;
           original_filename: string;
           source_folder: string | null;
           title: string;
@@ -40,6 +47,7 @@ export type Database = {
           metadata_review_required?: boolean;
           file_hash?: string | null;
           id?: string;
+          library_id: string;
           original_filename: string;
           source_folder?: string | null;
           title: string;
@@ -57,11 +65,20 @@ export type Database = {
           metadata_review_required?: boolean;
           file_hash?: string | null;
           id?: string;
+          library_id?: string;
           original_filename?: string;
           source_folder?: string | null;
           title?: string;
         };
-        Relationships: [];
+        Relationships: [
+          {
+            foreignKeyName: "songs_library_id_fkey";
+            columns: ["library_id"];
+            isOneToOne: false;
+            referencedRelation: "libraries";
+            referencedColumns: ["id"];
+          },
+        ];
       };
       ratings: {
         Row: {
@@ -102,3 +119,4 @@ export type Database = {
 
 export type SongRow = Database["public"]["Tables"]["songs"]["Row"];
 export type RatingRow = Database["public"]["Tables"]["ratings"]["Row"];
+export type LibraryRow = Database["public"]["Tables"]["libraries"]["Row"];

@@ -1,6 +1,7 @@
 -- Apply in the Supabase SQL Editor after enabling administrative login.
 -- Additive and safe to run again: no rows or existing anon permissions change.
 
+grant select on table public.libraries to authenticated;
 grant select on table public.songs to authenticated;
 grant select on table public.ratings to authenticated;
 
