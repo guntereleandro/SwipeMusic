@@ -1,5 +1,5 @@
 import { notFound } from "next/navigation";
-import { MusicRater } from "@/components/music-rater";
+import { TutorialGate } from "@/components/tutorial/tutorial-gate";
 import { getLibraryBySlug } from "@/lib/supabase/repositories/libraries";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 
@@ -9,5 +9,5 @@ export default async function LibraryPage({ params }: PageProps<"/[slug]">) {
   const { slug } = await params;
   const library = await getLibraryBySlug(slug, await createServerSupabaseClient());
   if (!library) notFound();
-  return <MusicRater libraryId={library.id} libraryName={library.name} />;
+  return <TutorialGate libraryId={library.id} libraryName={library.name} librarySlug={library.slug} />;
 }

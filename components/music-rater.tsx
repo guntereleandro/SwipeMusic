@@ -61,7 +61,7 @@ function getErrorMessage(error: unknown, fallback: string) {
   return error instanceof Error ? error.message : fallback;
 }
 
-export function MusicRater({ libraryId, libraryName }: { libraryId: string; libraryName: string }) {
+export function MusicRater({ libraryId, libraryName, onOpenTutorial }: { libraryId: string; libraryName: string; onOpenTutorial?: () => void }) {
   const operationLock = useRef(false);
   const [songs, setSongs] = useState<Song[]>([]);
   const [history, setHistory] = useState<string[]>([]);
@@ -183,6 +183,7 @@ export function MusicRater({ libraryId, libraryName }: { libraryId: string; libr
             </h1>
           </div>
           <div className="flex items-center gap-3">
+            {onOpenTutorial && <button type="button" onClick={onOpenTutorial} className="min-h-11 rounded-lg px-2 text-xs font-semibold text-zinc-500 hover:bg-white/[0.05] hover:text-zinc-300 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-500">Como funciona?</button>}
             <p className="text-xs font-medium tabular-nums text-zinc-400" aria-live="polite">
               <strong className="text-zinc-100">{progress.evaluated}</strong> de {progress.total}{" "}
               avaliadas

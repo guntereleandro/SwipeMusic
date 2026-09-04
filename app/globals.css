@@ -61,3 +61,47 @@ button {
   outline: 2px solid #f59e0b;
   outline-offset: 5px;
 }
+
+@keyframes tutorial-demo-right {
+  0%, 67%, 100% { transform: translateX(0) rotate(0); }
+  38% { transform: translateX(min(55px, 14%)) rotate(1.5deg); }
+}
+
+@keyframes tutorial-demo-left {
+  0%, 67%, 100% { transform: translateX(0) rotate(0); }
+  38% { transform: translateX(max(-55px, -14%)) rotate(-1.5deg); }
+}
+
+@keyframes tutorial-demo-feedback {
+  0%, 67%, 100% { opacity: 0; }
+  38% { opacity: .55; }
+}
+
+@keyframes tutorial-control-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgb(251 191 36 / 0%); }
+  50% { box-shadow: 0 0 0 5px rgb(251 191 36 / 13%); }
+}
+
+.tutorial-demo-stage { position: relative; padding-top: 2rem; }
+.tutorial-demo-motion--right { animation: tutorial-demo-right 2.1s ease-in-out 0.4s infinite; }
+.tutorial-demo-motion--left { animation: tutorial-demo-left 2.1s ease-in-out 0.4s infinite; }
+.tutorial-demo-feedback { animation: tutorial-demo-feedback 2.1s ease-in-out 0.4s infinite; }
+.tutorial-swipe-cue { position: absolute; top: 0; z-index: 10; display: flex; align-items: center; gap: .45rem; font-size: .75rem; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
+.tutorial-swipe-cue--right { right: .75rem; color: #86efac; }
+.tutorial-swipe-cue--left { left: .75rem; color: #fda4af; }
+.tutorial-control-arrow { position: absolute; inset: 0 0 auto; display: flex; height: 1.6rem; align-items: center; justify-content: center; gap: .35rem; color: #fcd34d; font-size: .9rem; font-weight: 700; }
+.tutorial-control-arrow span { font-size: .7rem; letter-spacing: .03em; }
+.tutorial-actions--like button:nth-child(3),
+.tutorial-actions--dislike button:nth-child(1),
+.tutorial-actions--neutral button:nth-child(2),
+.tutorial-undo-highlight { animation: tutorial-control-pulse 1.6s ease-in-out infinite; border-color: rgb(251 191 36 / 48%); }
+
+@media (prefers-reduced-motion: reduce) {
+  .tutorial-demo-motion--right,
+  .tutorial-demo-motion--left,
+  .tutorial-demo-feedback,
+  .tutorial-actions--like button:nth-child(3),
+  .tutorial-actions--dislike button:nth-child(1),
+  .tutorial-actions--neutral button:nth-child(2),
+  .tutorial-undo-highlight { animation: none; }
+}
