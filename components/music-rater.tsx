@@ -13,6 +13,7 @@ import {
 import { listSongs } from "@/lib/supabase/repositories/songs";
 import { getAudioUrl, getCoverUrl } from "@/lib/supabase/media";
 import { getLibraryProgress } from "@/lib/music/library";
+import { buildSessionQueue, restoreSongForUndo } from "@/lib/music/session-queue";
 import {
   continuousPlaybackAfterManualAction,
   INITIAL_CONTINUOUS_PLAYBACK,
@@ -46,8 +47,12 @@ async function fetchMusicLibrary() {
   const [songRows, ratingRows] = await Promise.all([listSongs(), listRatings()]);
   const ratingBySongId = new Map(ratingRows.map((rating) => [rating.song_id, rating]));
 
+  const songs = songRows.map((song) => toSong(song, ratingBySongId.get(song.id)));
+  const pendingQueue = buildSessionQueue(songs);
+  const ratedSongs = songs.filter((song) => song.status !== "PENDING");
+
   return {
-    songs: songRows.map((song) => toSong(song, ratingBySongId.get(song.id))),
+    songs: [...pendingQueue, ...ratedSongs],
     history: ratingRows.map((rating) => rating.song_id),
   };
 }
@@ -152,15 +157,7 @@ export function MusicRater() {
       const undoneRating = await deleteLastRating();
       if (!undoneRating) return;
 
-      setSongs((currentSongs) => {
-        const restoredSong = currentSongs.find((song) => song.id === undoneRating.song_id);
-        if (!restoredSong) return currentSongs;
-
-        return [
-          { ...restoredSong, status: "PENDING" },
-          ...currentSongs.filter((song) => song.id !== undoneRating.song_id),
-        ];
-      });
+      setSongs((currentSongs) => restoreSongForUndo(currentSongs, undoneRating.song_id));
       setHistory((currentHistory) => currentHistory.slice(0, -1));
     } catch (undoError) {
       setError({
